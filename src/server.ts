@@ -4,6 +4,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { Item } from "./models/Item.js";
 import { GoogleGenAI } from "@google/genai";
+import { User } from "./models/user.js";
 
 dotenv.config();
 const app = express();
@@ -37,12 +38,41 @@ app.post("/api/items", async (req: Request, res: Response) => {
 });
 
 // 📋 ২. সব আইটেম গেট করার রুট
-app.get("/api/items", async (req: Request, res: Response) => {
+// 📝 রেজিস্ট্রেশন এপিআই রুট
+app.post("/api/auth/register", async (req: Request, res: Response) => {
   try {
-    const items = await Item.find().sort({ createdAt: -1 });
-    res.json(items);
+    const { name, email, password } = req.body;
+
+    // ইমেইল অলরেডি আছে কিনা চেক
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: "Email already registered" });
+    }
+
+    const newUser = new User({ name, email, password });
+    await newUser.save();
+    res
+      .status(201)
+      .json({ success: true, message: "User registered successfully!" });
   } catch (err) {
-    res.status(500).json({ error: "Server Error" });
+    console.error("Registration error:", err);
+    res.status(500).json({ error: "Failed to register user" });
+  }
+});
+
+// 🔐 লগইন এপিআই রুট
+app.post("/api/auth/login", async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email, password });
+
+    if (!user) {
+      return res.status(400).json({ error: "Invalid email or password" });
+    }
+
+    res.json({ success: true, user: { name: user.name, email: user.email } });
+  } catch (err) {
+    res.status(500).json({ error: "Login failed" });
   }
 });
 
