@@ -1,5 +1,6 @@
 import mongoose, { Schema, Document } from "mongoose";
 
+// ১. টাইপস্ক্রিপ্ট ইন্টারফেস (সবার উপরে থাকবে)
 export interface IItem extends Document {
   title: string;
   shortDesc: string;
@@ -10,6 +11,7 @@ export interface IItem extends Document {
   imageUrl?: string;
 }
 
+// ২. মঙ্গুজ স্কিমা (মাঝখানে থাকবে)
 const ItemSchema: Schema = new Schema(
   {
     title: { type: String, required: true },
@@ -27,5 +29,6 @@ const ItemSchema: Schema = new Schema(
   { timestamps: true },
 );
 
-export default mongoose.models.Item ||
-  mongoose.model<IItem>("Item", ItemSchema);
+// ৩. মডেল এক্সপোর্ট (সবার শেষে একবারই থাকবে)
+export const Item =
+  mongoose.models.Item || mongoose.model<IItem>("Item", ItemSchema);
