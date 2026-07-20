@@ -32,7 +32,7 @@ const client = new MongoClient(mongoUri, {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
 
     const db = client.db("ProcureMind-AI");
     const itemsCollection = db.collection<IItem>("items");
