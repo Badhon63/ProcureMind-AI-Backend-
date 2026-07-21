@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
 import { IItem } from "./models/Item.js";
+import Groq from "groq-sdk";
 
 dotenv.config();
 const app = express();
@@ -68,6 +69,26 @@ async function run() {
       }
     });
 
+    app.get(
+      "/api/items/:id",
+      async (req: Request<{ id: string }>, res: Response) => {
+        try {
+          const item = await itemsCollection.findOne({
+            _id: new ObjectId(req.params.id),
+          });
+
+          if (!item) {
+            return res.status(404).json({ error: "Item not found" });
+          }
+
+          res.json(item);
+        } catch (err) {
+          console.error("GET /api/items/:id error:", err);
+          res.status(500).json({ error: "Server Error" });
+        }
+      },
+    );
+
     // ২. POST Item
     app.post("/api/items", async (req: Request, res: Response) => {
       try {
@@ -100,25 +121,67 @@ async function run() {
     );
 
     // ৪. AI Analysis
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
     app.post("/api/ai/analyze", async (req: Request, res: Response) => {
       const { supplyData } = req.body;
       try {
         const prompt = `You are an expert supply chain procurement AI agent. Analyze the following budget data and output a clean, strict JSON response containing three keys: "rawMaterialsCost", "logisticsCost", "savingsOpportunity", and "riskAnalysisSummary". Do not include any markdown or backticks in the response. Data: ${supplyData}`;
 
-        const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: prompt,
+        const completion = await groq.chat.completions.create({
+          model: "llama-3.3-70b-versatile",
+          messages: [{ role: "user", content: prompt }],
         });
 
-        const result = JSON.parse(response.text?.trim() || "{}");
+        const result = JSON.parse(
+          completion.choices[0]?.message?.content?.trim() || "{}",
+        );
         res.json(result);
       } catch (err) {
         console.error(err);
         res.status(500).json({ error: "AI Processing Failed" });
       }
     });
+
+    //5. AI description generator
+    app.post(
+      "/api/ai/generate-description",
+      async (req: Request, res: Response) => {
+        const { title, shortDesc, length } = req.body;
+
+        if (!title || !shortDesc) {
+          return res
+            .status(400)
+            .json({ error: "title and shortDesc are required" });
+        }
+
+        try {
+          const wordTarget =
+            length === "short"
+              ? "80-100"
+              : length === "long"
+                ? "250-300"
+                : "150-180";
+
+          const prompt = `You are an expert procurement specification writer. Based on the project title and short description below, write a detailed, professional full specification for a sourcing request (RFP). The tone should be formal and specific, as if written by a corporate procurement officer. Write approximately ${wordTarget} words. Do not include markdown, headers, or bullet points — just plain paragraph text. Do not repeat the title verbatim as a heading.
+
+Title: ${title}
+Short Description: ${shortDesc}`;
+
+          const completion = await groq.chat.completions.create({
+            model: "llama-3.3-70b-versatile",
+            messages: [{ role: "user", content: prompt }],
+          });
+
+          const generatedText =
+            completion.choices[0]?.message?.content?.trim() || "";
+          res.json({ fullDesc: generatedText });
+        } catch (err) {
+          console.error("AI description generation error:", err);
+          res.status(500).json({ error: "Failed to generate description" });
+        }
+      },
+    );
 
     app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
   } catch (err) {
