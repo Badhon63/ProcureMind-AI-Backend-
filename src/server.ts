@@ -1,10 +1,9 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { GoogleGenAI } from "@google/genai";
 import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
 import { IItem } from "./models/Item.js";
-import Groq from "groq-sdk";
+import { Groq } from "groq-sdk";
 
 dotenv.config();
 const app = express();
